@@ -1,12 +1,12 @@
 from rest_framework import serializers
 from .models import Book, BookCopy, BookLending
-from authors.serializers import AuthorSerializer
+from authors.serializers import AuthorBookSerializer
 from genres.serializers import GenreSerializer
 from authors.models import Author
 
 
 class BookSerializer(serializers.ModelSerializer):
-    authors = AuthorSerializer(many=True, read_only=True)
+    authors = AuthorBookSerializer(many=True, read_only=True)
     genre = GenreSerializer(read_only=True)
 
     author_ids = serializers.PrimaryKeyRelatedField(
