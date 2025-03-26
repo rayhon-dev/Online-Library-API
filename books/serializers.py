@@ -1,79 +1,67 @@
 from rest_framework import serializers
 from .models import Book, BookCopy, BookLending
-from authors.serializers import AuthorBookSerializer
-from genres.serializers import GenreSerializer
-from authors.models import Author
+from authors.serializers import AuthorShortSerializer
+from genres.serializers import GenreShortSerializer
 
 
 class BookSerializer(serializers.ModelSerializer):
-    authors = AuthorBookSerializer(many=True, read_only=True)
-    genre = GenreSerializer(read_only=True)
+    copies_available = serializers.SerializerMethodField()
 
-    author_ids = serializers.PrimaryKeyRelatedField(
-        queryset=Author.objects.all(), many=True, write_only=True
-    )
     class Meta:
         model = Book
-        fields = ['id', 'title', 'authors', 'genre', 'isbn', 'published_date', 'desc', 'page_count', 'lang', 'author_ids']
+        fields = ['id', 'title', 'authors', 'genre', 'isbn', 'published_date', 'desc', 'page_count', 'lang', 'copies_available']
 
-    def create(self, validated_data):
-        author_ids = validated_data.pop('author_ids', [])
-        book = Book.objects.create(**validated_data)
-        book.authors.set(author_ids)
-        return book
+    def get_copies_available(self, obj):
+        return obj.book_copies.count()
 
-    def update(self, instance, validated_data):
-        author_ids = validated_data.pop('author_ids', None)
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data['authors'] = AuthorShortSerializer(instance.authors).data
+        data['genre'] = GenreShortSerializer(instance.genre).data
+        return data
 
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
 
-        if author_ids is not None:
-            instance.authors.set(author_ids)
+class AuthorBookSerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+    title = serializers.CharField(read_only=True)
+    isbn = serializers.CharField(read_only=True)
+    published_date = serializers.DateField(read_only=True)
+    copies_available = serializers.IntegerField(read_only=True)
 
-        instance.save()
-        return instance
+
+class BookShortSerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+    title = serializers.CharField(read_only=True)
+    isbn = serializers.CharField(read_only=True)
 
 
 class BookCopySerializer(serializers.ModelSerializer):
-    book = BookSerializer(read_only=True)
+    current_lending = serializers.SerializerMethodField()
 
 
     class Meta:
         model = BookCopy
-        fields = ['id', 'book', 'inventory_number', 'condition', 'is_available', 'added_time']
+        fields = ['id', 'book', 'inventory_number', 'condition', 'is_available', 'added_time', 'current_lending']
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data['book'] = BookShortSerializer(instance.book).data
+        return data
+
+class BookCopyShortSerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+    inventory_number = serializers.CharField(read_only=True)
+
+
 
 class BookLendingSerializer(serializers.ModelSerializer):
-    book_copy = BookCopySerializer(read_only=True)
-    book_copy_id = serializers.PrimaryKeyRelatedField(
-        queryset=BookCopy.objects.all(), write_only=True
-    )
 
     class Meta:
         model = BookLending
-        fields = ['id', 'book_copy', 'book_copy_id', 'borrower_name', 'borrower_email', 'borrowed_date', 'due_date', 'returned_date', 'status']
+        fields = ['id', 'book_copy', 'borrower_name', 'borrower_email', 'borrowed_date', 'due_date', 'returned_date', 'status']
 
-    def create(self, validated_data):
-        book_copy = validated_data.pop('book_copy_id')
 
-        # Kitob allaqachon olingan bo'lsa, xatolik qaytariladi
-        if not book_copy.is_available:
-            raise serializers.ValidationError({"book_copy_id": "This book copy is already borrowed."})
-
-        lending = BookLending.objects.create(book_copy=book_copy, **validated_data)
-
-        # Kitob olingandan keyin uni mavjud emas deb belgilaymiz
-        book_copy.is_available = False
-        book_copy.save()
-
-        return lending
-
-    def update(self, instance, validated_data):
-        returned_date = validated_data.get('returned_date', None)
-
-        # Agar kitob qaytarilgan bo‘lsa, uni "mavjud" qilib belgilaymiz
-        if returned_date:
-            instance.book_copy.is_available = True
-            instance.book_copy.save()
-
-        return super().update(instance, validated_data)
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data['book_copy'] = BookCopyShortSerializer(instance.book_copy).data
+        return data

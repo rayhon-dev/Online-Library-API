@@ -1,15 +1,15 @@
 from rest_framework import generics
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from django.shortcuts import get_object_or_404
-from books.serializers import BookSerializer
 from .models import Author
+from .pagination import AuthorPagination, AuthorBookPagination
 from .serializers import AuthorSerializer
+from books.serializers import AuthorBookSerializer
+from books.models import Book
 
 
 class AuthorListCreateView(generics.ListCreateAPIView):
     queryset = Author.objects.all()
     serializer_class = AuthorSerializer
+    pagination_class = AuthorPagination
 
 
 
@@ -19,10 +19,10 @@ class AuthorRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     lookup_field = 'pk'
 
 
-class AuthorBookView(APIView):
-    def get(self, request, pk):
-        author = get_object_or_404(Author, pk=pk)
-        books = author.books.all()
-        serializer = BookSerializer(books, many=True)
-        return Response(serializer.data, status=200)
+class AuthorBookView(generics.ListAPIView):
+    queryset = Author.objects.all()
+    serializer_class = AuthorBookSerializer
+    pagination_class = AuthorBookPagination
 
+    def get_queryset(self):
+        return Book.objects.filter(authors__id=self.kwargs['pk'])

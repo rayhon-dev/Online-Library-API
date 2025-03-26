@@ -14,8 +14,8 @@ class AuthorSerializer(serializers.ModelSerializer):
         return obj.books.count()
 
 
-class AuthorBookSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Author
-        fields = ['id', 'first_name', 'last_name']
-        read_only_fields = ['id']
+class AuthorShortSerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+    first_name = serializers.CharField(read_only=True)
+    last_name = serializers.CharField(read_only=True)
+
